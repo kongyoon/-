@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
-import { Mic, Square, Loader2, Send, Moon, MessageSquare, BookOpen, Tags, Smile, Search, Calendar, ChevronRight, Hash, ArrowLeft, BarChart3, Trash2 } from "lucide-react";
+import { Mic, Square, Loader2, Send, Moon, MessageSquare, BookOpen, Tags, Smile, Search, Calendar, ChevronRight, Hash, ArrowLeft, BarChart3, Trash2, Edit3 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import Markdown from "react-markdown";
-import { processDreamAudio, generateDreamImage, createDreamChat, DreamAnalysis, analyzeMoodCorrelations } from "./lib/gemini";
+import { processDreamAudio, processDreamText, generateDreamImage, createDreamChat, DreamAnalysis, analyzeMoodCorrelations } from "./lib/gemini";
 import { DreamEntry, saveDream, getDreams, deleteDream } from "./lib/store";
 
-type AppState = "idle" | "recording" | "processing" | "result" | "archive";
+type AppState = "idle" | "recording" | "textInput" | "processing" | "result" | "archive";
 
 const MOODS = ["기쁨", "평온함", "불안함", "슬픔", "경이로움", "혼란스러움", "두려움", "지적 호기심", "분노", "무기력"];
 
@@ -21,6 +21,7 @@ export default function App() {
   const [correlationText, setCorrelationText] = useState("");
   const [isAnalyzingMood, setIsAnalyzingMood] = useState(false);
   const [searchTag, setSearchTag] = useState("");
+  const [textInput, setTextInput] = useState("");
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<BlobPart[]>([]);
@@ -32,6 +33,41 @@ export default function App() {
   const loadEntries = async () => {
     const list = await getDreams();
     setEntries(list);
+  };
+
+  const submitText = async () => {
+    if (!textInput.trim()) return;
+    setAppState("processing");
+    try {
+      setProcessingStatus("융의 시선으로 원형을 분석하는 중...");
+      const result = await processDreamText(textInput);
+      
+      setProcessingStatus("꿈의 심상을 캔버스에 그리는 중...");
+      const img = await generateDreamImage(result.imagePrompt);
+      
+      const newEntry: DreamEntry = {
+        id: generateId(),
+        timestamp: Date.now(),
+        analysis: result,
+        imageUrl: img,
+        mood: null,
+        tags: []
+      };
+      
+      await saveDream(newEntry);
+      setCurrentEntry(newEntry);
+      await loadEntries();
+      
+      setAppState("result");
+      setTextInput("");
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("해석 중 오류가 발생했습니다. 다시 시도해 주세요.");
+      setTimeout(() => {
+        setAppState("idle");
+        setErrorMsg("");
+      }, 4000);
+    }
   };
 
   const startRecording = async () => {
@@ -196,20 +232,32 @@ export default function App() {
                 무의식의 바다에서 건져올린 기억이 희미해지기 전에 기록하세요. 의식의 언어로 해석해 드립니다.
               </p>
 
-              <button
-                onClick={appState === "idle" ? startRecording : stopRecording}
-                className={`group flex items-center justify-center w-28 h-28 rounded-full transition-all duration-500 hover:scale-105 active:scale-95 ${
-                  appState === "recording" 
-                    ? "bg-red-500/20 border border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.4)] animate-pulse" 
-                    : "bg-indigo-500/20 border border-indigo-500/50 shadow-[0_0_40px_rgba(99,102,241,0.3)]"
-                }`}
-              >
-                {appState === "idle" ? (
-                  <Mic className="w-10 h-10 md:w-12 md:h-12 text-indigo-400 group-hover:text-indigo-300 transition-colors" />
-                ) : (
-                  <Square className="w-8 h-8 md:w-10 md:h-10 text-red-500 fill-red-500" />
+              <div className="flex flex-col items-center gap-6">
+                <button
+                  onClick={appState === "idle" ? startRecording : stopRecording}
+                  className={`group flex items-center justify-center w-28 h-28 rounded-full transition-all duration-500 hover:scale-105 active:scale-95 ${
+                    appState === "recording" 
+                      ? "bg-red-500/20 border border-red-500/50 shadow-[0_0_50px_rgba(239,68,68,0.4)] animate-pulse" 
+                      : "bg-indigo-500/20 border border-indigo-500/50 shadow-[0_0_40px_rgba(99,102,241,0.3)]"
+                  }`}
+                >
+                  {appState === "idle" ? (
+                    <Mic className="w-10 h-10 md:w-12 md:h-12 text-indigo-400 group-hover:text-indigo-300 transition-colors" />
+                  ) : (
+                    <Square className="w-8 h-8 md:w-10 md:h-10 text-red-500 fill-red-500" />
+                  )}
+                </button>
+                
+                {appState === "idle" && (
+                  <button 
+                    onClick={() => setAppState("textInput")}
+                    className="flex items-center gap-2 px-6 py-3 rounded-full border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/10 transition-colors"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                    <span className="text-sm font-medium">글로 쓰기</span>
+                  </button>
                 )}
-              </button>
+              </div>
               
               <div className="mt-8 h-6">
                 {appState === "recording" ? (
@@ -226,6 +274,45 @@ export default function App() {
                 {errorMsg && (
                   <p className="text-red-400 mt-4 font-light">{errorMsg}</p>
                 )}
+              </div>
+            </motion.div>
+          )}
+
+          {appState === "textInput" && (
+            <motion.div
+              key="text-view"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20, filter: "blur(10px)" }}
+              transition={{ duration: 0.6, ease: "easeOut" }}
+              className="flex-1 flex flex-col items-center justify-center p-6 w-full max-w-3xl mx-auto"
+            >
+              <h2 className="text-3xl font-bold mb-8 text-white tracking-tight">
+                꿈의 내용을 적어주세요
+              </h2>
+              <div className="w-full relative shadow-[0_0_30px_rgba(99,102,241,0.1)] rounded-3xl overflow-hidden">
+                <textarea
+                  value={textInput}
+                  onChange={(e) => setTextInput(e.target.value)}
+                  placeholder="예: 끝이 없는 도서관을 걷고 있었어요. 책장들이 구름 위로 솟아있었고..."
+                  className="w-full h-64 bg-slate-900/60 border border-slate-700 p-6 text-slate-200 text-lg rounded-3xl focus:outline-none focus:border-indigo-500 transition-colors resize-none placeholder-slate-600 font-sans"
+                />
+              </div>
+              <div className="flex gap-4 mt-8 w-full justify-center">
+                <button
+                  onClick={() => setAppState("idle")}
+                  className="px-8 py-4 rounded-full border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors font-medium"
+                >
+                  취소
+                </button>
+                <button
+                  onClick={submitText}
+                  disabled={!textInput.trim()}
+                  className="px-8 py-4 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-800 disabled:text-slate-500 text-white transition-colors font-medium flex items-center gap-2 shadow-[0_0_20px_rgba(99,102,241,0.4)] disabled:shadow-none"
+                >
+                  <Send className="w-4 h-4" />
+                  기록하고 해석하기
+                </button>
               </div>
             </motion.div>
           )}

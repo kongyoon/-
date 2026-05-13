@@ -1,11 +1,11 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Jua&family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap');
 
 body {
   margin: 0;
   height: 100%;
   overflow: hidden;
-  font-family: "Noto Sans KR", system-ui, sans-serif;
+  font-family: "Jua", "Nunito", system-ui, sans-serif;
   background-color: #020617;
   color: #e2e8f0;
   -webkit-font-smoothing: antialiased;

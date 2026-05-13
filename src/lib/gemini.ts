@@ -53,6 +53,41 @@ export async function processDreamAudio(
   return JSON.parse(jsonStr) as DreamAnalysis;
 }
 
+export async function processDreamText(text: string): Promise<DreamAnalysis> {
+  const ai = getAi();
+  const response = await ai.models.generateContent({
+    model: "gemini-3.1-pro-preview",
+    contents: [
+      `이 꿈 기록을 읽고 칼 융(Carl Jung)의 분석심리학적 원형(archetypes)을 바탕으로 꿈의 핵심 감정적 주제와 상징을 구조적으로 해석해 줘. 마지막으로, 이 꿈의 핵심 감정적 주제를 나타내는 초현실주의(surrealist) 이미지 생성을 위한 짧은 영어 프롬프트(imagePrompt)를 작성해 줘. 사용자가 입력한 텍스트 전문은 transcription 필드에 그대로 반환해 줘. 반환형식은 포함된 JSON 스키마를 따를 것.\n\n[꿈 내용]\n${text}`,
+    ],
+    config: {
+      responseMimeType: "application/json",
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          transcription: { type: Type.STRING, description: "사용자 꿈 기록 (한국어)" },
+          imagePrompt: { type: Type.STRING, description: "초현실주의 이미지 생성을 위한 영어 프롬프트" },
+          summary: { type: Type.STRING, description: "융의 심리학을 바탕으로 한 꿈의 전반적인 해석 요약 (한국어)" },
+          symbols: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                symbol: { type: Type.STRING },
+                meaning: { type: Type.STRING },
+              },
+            },
+          },
+        },
+        required: ["transcription", "imagePrompt", "summary", "symbols"],
+      },
+    },
+  });
+
+  const jsonStr = response.text || "{}";
+  return JSON.parse(jsonStr) as DreamAnalysis;
+}
+
 export async function generateDreamImage(prompt: string): Promise<string> {
   const ai = getAi();
   const response = await ai.models.generateContent({
