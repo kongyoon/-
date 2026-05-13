@@ -1,0 +1,8 @@
+{
+  "name": "Dreamscape AI",
+  "description": "Voice-record your dreams for Jungian transcription, surreal visual generation, and AI symbol chat.",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": []
+}
